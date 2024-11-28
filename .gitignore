@@ -1,0 +1,9 @@
+/node_modules
+/keys
+/output
+/uploads
+/videos
+/frontend/node_modules
+/dist
+.env
+/venv
