@@ -7,19 +7,20 @@ import {
   verifyAccessToken,
   verifyToken,
 } from "../config/jwt";
+import { deleteFile, uploadAssessment, uploadImages } from "../config/s3";
 
 export const refresh = (req: Request, res: Response) => {
   try {
     console.log(
       "  refreshhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
     );
-    const cookies = req.cookies;
+    const { refreshToken } = req.body;
 
-    if (!cookies?.jwt) {
+    if (!refreshToken) {
       return res.status(401).json({ message: "No refresh token provided" });
     }
 
-    const refreshToken = cookies.jwt;
+   
     const accessToken = verifyAccessToken(refreshToken);
 
     if (!accessToken) {
@@ -63,17 +64,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const refreshToken = await generateRefreshToken(user); // Await the refresh token generation
 
     // Set refresh token as HttpOnly cookie
-    res.cookie("jwt", refreshToken, {
-      httpOnly: true, // Prevents client-side access to the cookie
-      secure: process.env.NODE_ENV === "production", // Only send over HTTPS in production
-      sameSite: "strict", // Lowercase 'strict'
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    // res.cookie("jwt", refreshToken, {
+    //   httpOnly: true, // Prevents client-side access to the cookie
+    //   secure: process.env.NODE_ENV === "production", // Only send over HTTPS in production
+    //   sameSite: "strict", // Lowercase 'strict'
+    //   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    // });
 
     // Send access token and user details in the response
     res.status(200).json({
       message: "Login Success",
       token: accessToken,
+      refreshToken: refreshToken, 
       name: user.userName,
     });
   } catch (e) {
@@ -152,6 +154,56 @@ export const listUsers = async (req: Request, res: Response): Promise<void> => {
   try {
     const users = await User.find();
     res.status(200).json({ data: users });
+  } catch (e) {
+    res.status(503).json({ message: "Error occured" });
+  }
+};
+
+export const getProfile = async (
+  req: Request | any,
+  res: Response
+): Promise<void> => {
+  try {
+    const userID = req.user.id;
+    const user = await User.findById({ _id: userID });
+    res.status(200).json({ data: user });
+  } catch (e) {
+    res.status(503).json({ message: "Error occured" });
+  }
+};
+
+
+export const postProfile = async (
+  req: Request | any,
+  res: Response
+): Promise<void> => {
+  try {
+    const userID = req.user.id; // Get user id from the JWT payload
+
+    // Access the uploaded file via req.file
+    const file = req.file;
+    const { type } = req.body;
+    if (!file && type === "add") {
+      res.status(400).json({ message: "No file uploaded" });
+      return;
+    }
+
+    // Log file details (optional for debugging)
+    console.log("File uploaded:", file);
+
+    const oldUser = await User.findById({ _id: userID });
+
+    if (type === "add" && file) {
+      await uploadImages(file);
+    }
+
+    deleteFile(`/quiz/${oldUser?.image}`);
+
+    const user = await User.updateOne(
+      { _id: userID },
+      { image: type === "add" ? file?.filename : null }
+    );
+    res.status(200).json({ message: "success" });
   } catch (e) {
     res.status(503).json({ message: "Error occured" });
   }

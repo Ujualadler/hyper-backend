@@ -81,6 +81,8 @@ export const verifyAccessToken = (refreshToken: string): string | null => {
 export const verifyToken = (req: any, res: any, next: NextFunction) => {
   let token;
   // Check if the token is in the 'Authorization' header
+
+  console.log('ianm hereeeeeeeeeeeeeeeeeeeeeeeeeeee')
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer ")

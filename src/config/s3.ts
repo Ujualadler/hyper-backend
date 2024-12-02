@@ -62,7 +62,30 @@ export const uploadAssessment = async (file: Express.Multer.File) => {
 
   const uploadParams = new PutObjectCommand({
     Bucket: bucketName,
-    Key: `assessments/${file.originalname}`,
+    Key: `quiz/${file.originalname}`,
+    Body: fileStream,
+    ContentType: file.mimetype,
+  });
+
+  try {
+    await s3.send(uploadParams);
+    console.log(
+      "Successfully uploaded data to " + bucketName + "/" + file.filename
+    );
+    // Delete file from local uploads folder
+    fs.unlinkSync(file.path);
+  } catch (err) {
+    console.error("error s3:", err);
+  }
+};
+
+
+export const uploadImages = async (file: Express.Multer.File) => {
+  const fileStream = fs.createReadStream(file.path);
+
+  const uploadParams = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: `quiz/${file.filename}`,
     Body: fileStream,
     ContentType: file.mimetype,
   });

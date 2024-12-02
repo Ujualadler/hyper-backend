@@ -4,25 +4,31 @@ import { Answer } from "../models/Answer"; // Import your Assessment model
 import { getFile, uploadAssessment, uploadFile } from "../config/s3";
 import { spawn } from "child_process";
 import mongoose from "mongoose";
+import User from "../models/User";
 
 export const createAssessment = async (req: Request, res: Response) => {
   try {
-    // const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-    // const file = files["file"];
-    // const optionfile = files["optionsfile"];
+    const file = files["file"];
+    const image = files["image"];
+    const optionfile = files["optionsfile"];
 
-    // if (file?.length && file[0]) {
-    //   await uploadAssessment(file[0]);
-    // }
+    if (file?.length && file[0]) {
+      await uploadAssessment(file[0]);
+    }
 
-    // if (optionfile?.length) {
-    //   for (let i = 0; i < optionfile.length; i++) {
-    //     if (optionfile[i]) {
-    //       await uploadAssessment(optionfile[i]);
-    //     }
-    //   }
-    // }
+    if (image?.length && image[0]) {
+      await uploadAssessment(image[0]);
+    }
+
+    if (optionfile?.length) {
+      for (let i = 0; i < optionfile.length; i++) {
+        if (optionfile[i]) {
+          await uploadAssessment(optionfile[i]);
+        }
+      }
+    }
 
     const {
       questionText,
@@ -47,7 +53,7 @@ export const createAssessment = async (req: Request, res: Response) => {
       time: time,
       mark: parseInt(questionMark, 10),
       correctAnswer: correctAnswer,
-      // file: file?.[0]?.originalname || null,
+      file: file?.[0]?.originalname || null,
     };
 
     // Only add options if questionType is 'multipleChoice' or 'singleChoice'
@@ -70,6 +76,7 @@ export const createAssessment = async (req: Request, res: Response) => {
       // Create a new assessment if it doesn't exist
       assessment = new Assessment({
         name: name,
+        image: image?.[0]?.originalname || null,
         difficulty: difficulty,
         category: category,
         class: selectedClass,
@@ -99,7 +106,7 @@ export const createAssessment = async (req: Request, res: Response) => {
 export const getAssessmentFile = async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
-    const fileStream = await getFile(`assessments/${key}` as string);
+    const fileStream = await getFile(`quiz/${key}` as string);
     fileStream?.pipe(res);
   } catch (e) {
     console.log("error while fetching");
@@ -116,35 +123,43 @@ export const getAllAssessment = async (req: any, res: Response) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    console.log("Current User ID:", userId);
-    console.log("Current category ID:", category);
-    console.log("Current difficulty ID:", difficulty);
+    const user = await User.findOne({ _id: userId });
+
+    let data;
+
+    if (user?.isAdmin === true) {
+      data = await Assessment.find().select(
+        "name category createdAt difficulty image"
+      );
+    } else {
+      const attendedAssessments = await Answer.find({ user: userId }).distinct(
+        "assessment"
+      );
+
+      console.log(
+        "Assessments attended by the current user:",
+        attendedAssessments
+      );
+
+      let query: any = { _id: { $nin: attendedAssessments } }; // Exclude attended assessments
+
+      // If difficulty is not provided (i.e., it is ''), fetch all assessments.
+
+      if (category !== "all") {
+        query.category = category; // Filter by category if provided
+      }
+
+      if (difficulty !== "") {
+        query.difficulty = difficulty; // Filter by difficulty if provided
+      }
+
+      // Fetch data based on the query
+      data = await Assessment.find(query).select(
+        "name category createdAt difficulty image"
+      );
+    }
 
     // Fetch the list of assessments attended by the current user
-    const attendedAssessments = await Answer.find({ user: userId }).distinct(
-      "assessment"
-    );
-
-    console.log(
-      "Assessments attended by the current user:",
-      attendedAssessments
-    );
-
-    let query: any = { _id: { $nin: attendedAssessments } }; // Exclude attended assessments
-
-    // If difficulty is not provided (i.e., it is ''), fetch all assessments.
-    if (category !== "all") {
-      query.category = category; // Filter by category if provided
-    }
-
-    if (difficulty !== "") {
-      query.difficulty = difficulty; // Filter by difficulty if provided
-    }
-
-    // Fetch data based on the query
-    const data = await Assessment.find(query).select(
-      "name category createdAt difficulty"
-    );
 
     console.log("Available Assessments:", data);
 
@@ -156,6 +171,37 @@ export const getAllAssessment = async (req: any, res: Response) => {
   } catch (error) {
     console.error("Error fetching assessments:", error);
     res.status(500).json({
+      message: "Internal Server Error",
+      error,
+    });
+  }
+};
+
+export const getAssessmentAdmin = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.query; // Extract question and id from the request body
+    console.log(id);
+
+    let data = await Assessment.findOne({ _id: id });
+
+    if (data) {
+      const { _doc }: any = data;
+
+      const indexedData = _doc?.questions.map(
+        (question: any, index: number) => ({
+          ...question._doc,
+          no: index + 1,
+        })
+      );
+
+      res.status(200).json({ ..._doc, questions: indexedData });
+    } else {
+      res.status(200).json({ questions: [] });
+    }
+    console.log(data);
+  } catch (error) {
+    console.error("Error creating/updating assessment:", error);
+    return res.status(500).json({
       message: "Internal Server Error",
       error,
     });
@@ -494,7 +540,7 @@ export const submitAssessment = async (req: Request | any, res: Response) => {
     if (!req.user) return res.status(401).json({ message: "Unauthorized" });
     const userId = req.user.id;
 
-    console.log(difficulty + "difficulty asjhakjshkash");
+    const userData = await User.findById({ _id: userId });
 
     const assessment = await Assessment.findOne({ _id: quizId });
     if (!assessment) {
@@ -601,24 +647,49 @@ export const submitAssessment = async (req: Request | any, res: Response) => {
       // Add a field for score percentage
       {
         $addFields: {
-          scorePercentage: { $divide: ["$totalMarks", "$totalScore"] },
+          priorityScore: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$difficulty", "hard"] }, then: 1000 },
+                { case: { $eq: ["$difficulty", "medium"] }, then: 500 },
+                { case: { $eq: ["$difficulty", "easy"] }, then: 100 },
+              ],
+              default: 0, // Fallback value if no difficulty matches
+            },
+          },
         },
       },
 
       // Sort by score percentage (descending)
       {
-        $sort: {
-          scorePercentage: -1, // Higher score percentages first
+        $addFields: {
+          combinedSortField: {
+            $add: [
+              {
+                $multiply: [
+                  { $divide: ["$totalMarks", "$totalScore"] },
+                  "$priorityScore",
+                ],
+              }, // Sort scorePercentage descending (multiply by -1)
+              { $divide: [{ $subtract: ["$quizTime", "$totalTime"] }, 1000] }, // Normalize totalTime by dividing it by a factor to avoid large numbers, and ensure ascending order
+            ],
+          },
         },
       },
 
-      // Assign ranks using $setWindowFields with $denseRank for proper tie handling
+      // Sort by the combinedSortField
+      {
+        $sort: {
+          combinedSortField: -1, // Sort by the combined field
+        },
+      },
+
       {
         $setWindowFields: {
           partitionBy: null, // Apply globally
-          sortBy: { scorePercentage: -1 }, // Sort by scorePercentage only
+          sortBy: { combinedSortField: -1 }, // Sort using the combined field
           output: {
-            rank: { $denseRank: {} }, // Assign ranks with skipping logic
+            rank: { $rank: {} }, // Assign rank based on sorted order
           },
         },
       },
@@ -635,11 +706,18 @@ export const submitAssessment = async (req: Request | any, res: Response) => {
           rank: 1,
           totalMarks: 1,
           totalScore: 1,
-          scorePercentage: 1,
+          combinedSortField: 1,
           submittedAt: 1,
         },
       },
     ]);
+
+    const totalPoints = userData?.totalPoints + rankData[0].combinedSortField;
+
+    const update = await User.updateOne(
+      { _id: userId },
+      { $set: { totalPoints: totalPoints } }
+    );
 
     const currentRank = rankData[0]?.rank || null;
 
@@ -694,13 +772,13 @@ const evaluateDescriptiveAnswer = (data: any) => {
   });
 };
 
-export const getRankList = async (req: Request|any, res: Response) => {
+export const getRankList = async (req: Request | any, res: Response) => {
   try {
     const { assessmentId } = req.body;
 
-    if(!req.user) return res.status(401).json({message:'Unauthorized'})
+    if (!req.user) return res.status(401).json({ message: "Unauthorized" });
 
-      const userId=req.user.id
+    const userId = req.user.id;
 
     // Validate input
     if (!assessmentId) {
@@ -734,8 +812,13 @@ export const getRankList = async (req: Request|any, res: Response) => {
       {
         $addFields: {
           combinedSortField: {
-            $subtract: [
-              { $multiply: ["$priorityScore", 1] }, // Sort scorePercentage descending (multiply by -1)
+            $add: [
+              {
+                $multiply: [
+                  { $divide: ["$totalMarks", "$totalScore"] },
+                  "$priorityScore",
+                ],
+              }, // Sort scorePercentage descending (multiply by -1)
               { $divide: [{ $subtract: ["$quizTime", "$totalTime"] }, 1000] }, // Normalize totalTime by dividing it by a factor to avoid large numbers, and ensure ascending order
             ],
           },
@@ -791,9 +874,8 @@ export const getRankList = async (req: Request|any, res: Response) => {
       },
     ]);
 
-    // console.log(rankList)
-
-    return res.status(200).json({data:rankList,user:userId});
+    console.log(rankList);
+    return res.status(200).json({ data: rankList, user: userId });
   } catch (error) {
     console.error("Error fetching rank list:", error);
     res.status(500).json({ message: "Internal Server Error", error });
@@ -860,7 +942,7 @@ export const getOverallRankList = async (req: Request | any, res: Response) => {
       {
         $addFields: {
           combinedSortField: {
-            $subtract: [
+            $add: [
               { $multiply: ["$totalPriorityScore", 1] }, // Sort by priority-adjusted score (descending by default)
               {
                 $divide: [
@@ -937,20 +1019,26 @@ export const getPreviousQuizzes = async (req: any, res: Response) => {
     }
 
     const rewardData = {
-      totalQuizzes:0,
-      totalQuestionsAnswerd:0,
-      correctQuestionsAnswerd:0,
-      totalTimesSpend:0,
+      totalQuizzes: 0,
+      totalQuestionsAnswerd: 0,
+      correctQuestionsAnswerd: 0,
+      totalTimesSpend: 0,
+      totalpointsCollected: 0,
+    };
 
-    }
+    const userData = await User.findById({ _id: userId });
 
     // Fetch the list of assessments attended by the current user
     const attendedAssessments = await Answer.find({ user: userId }).populate(
       "assessment"
     );
 
-    rewardData.totalQuizzes=attendedAssessments.length
-    rewardData.totalQuestionsAnswerd=attendedAssessments.reduce((sum:any,item:any)=>sum+item.answers.length,0)
+    rewardData.totalQuizzes = attendedAssessments.length;
+    rewardData.totalQuestionsAnswerd = attendedAssessments.reduce(
+      (sum: any, item: any) => sum + item.answers.length,
+      0
+    );
+
     rewardData.correctQuestionsAnswerd = attendedAssessments.reduce(
       (totalCorrect, data) =>
         totalCorrect +
@@ -963,10 +1051,7 @@ export const getPreviousQuizzes = async (req: any, res: Response) => {
       0
     );
 
-
-
-
-
+    rewardData.totalpointsCollected = userData?.totalPoints || 0;
 
     console.log(attendedAssessments);
 
@@ -985,7 +1070,9 @@ export const getPreviousQuizzes = async (req: any, res: Response) => {
     console.log("Available Assessments:", attendedAssessments);
 
     if (attendedAssessments.length > 0) {
-      res.status(200).json({ data: attendedAssessments,rewardData:rewardData });
+      res
+        .status(200)
+        .json({ data: attendedAssessments, rewardData: rewardData });
     } else {
       res.status(200).json({ data: [] });
     }

@@ -21,6 +21,7 @@ interface Question {
 // Define the Assessment interface that extends Mongoose's Document
 export interface AssessmentDocument extends Document {
   name: string;
+  image: string;
   questions: Question[];
   difficulty: string;
   category: "live" | "practice"; // Category of the assessment
@@ -53,6 +54,7 @@ const QuestionSchema = new Schema<Question>({
 // Define the Assessment Schema with a reference to the PPT schema
 const AssessmentSchema = new Schema<AssessmentDocument>({
   name: { type: String, required: true },
+  image: { type: String, default: null },
   questions: { type: [QuestionSchema], required: true }, // Array of questions
   category: {
     type: String,
