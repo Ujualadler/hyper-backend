@@ -11,16 +11,14 @@ import { deleteFile, uploadAssessment, uploadImages } from "../config/s3";
 
 export const refresh = (req: Request, res: Response) => {
   try {
-    console.log(
-      "  refreshhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
-    );
     const { refreshToken } = req.body;
+
+    console.log(`refresh token :${refreshToken}`);
 
     if (!refreshToken) {
       return res.status(401).json({ message: "No refresh token provided" });
     }
 
-   
     const accessToken = verifyAccessToken(refreshToken);
 
     if (!accessToken) {
@@ -63,19 +61,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const accessToken = generateAccessToken(user);
     const refreshToken = await generateRefreshToken(user); // Await the refresh token generation
 
-    // Set refresh token as HttpOnly cookie
-    // res.cookie("jwt", refreshToken, {
-    //   httpOnly: true, // Prevents client-side access to the cookie
-    //   secure: process.env.NODE_ENV === "production", // Only send over HTTPS in production
-    //   sameSite: "strict", // Lowercase 'strict'
-    //   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    // });
-
-    // Send access token and user details in the response
     res.status(200).json({
       message: "Login Success",
       token: accessToken,
-      refreshToken: refreshToken, 
+      image: user.image,
+      refreshToken: refreshToken,
       name: user.userName,
     });
   } catch (e) {
@@ -172,7 +162,6 @@ export const getProfile = async (
   }
 };
 
-
 export const postProfile = async (
   req: Request | any,
   res: Response
@@ -203,21 +192,55 @@ export const postProfile = async (
       { _id: userID },
       { image: type === "add" ? file?.filename : null }
     );
-    res.status(200).json({ message: "success" });
+    res.status(200).json({ message: "success", image: file?.filename });
   } catch (e) {
     res.status(503).json({ message: "Error occured" });
   }
 };
 
-// export const deleteUser = async (
-//   req: Request,
-//   res: Response
-// ): Promise<void> => {
-//   try {
-//     const { id } = req.params;
-//     const deltedUser = await User.deleteOne({ _id: id });
-//     res.status(200).json({ message: "Deleted Successfully" });
-//   } catch (e) {
-//     res.status(503).json({ message: "Error while deleting" });
-//   }
-// };
+export const changePassword = async (
+  req: Request | any,
+  res: Response
+): Promise<void> => {
+  const { currentPassword, newPassword } = req.body;
+
+  const userId = req.user.id;
+
+  try {
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ message: "User  not found." });
+      return;
+    }
+
+    // Check if the current password is correct
+    const isMatch = await bcrypt.compare(currentPassword, user.userPassword);
+    if (!isMatch) {
+      res.status(400).json({ message: "Current password is incorrect." });
+      return;
+    }
+
+    // Validate new password (you can add more validation as needed)
+    if (newPassword.length < 6) {
+      res
+        .status(400)
+        .json({ message: "New password must be at least 6 characters long." });
+      return;
+    }
+
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    user.userPassword = await bcrypt.hash(newPassword, salt);
+
+    // Save the updated user
+    await user.save();
+
+    res.status(200).json({ message: "Password updated successfully!" });
+    return;
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error." });
+    return;
+  }
+};

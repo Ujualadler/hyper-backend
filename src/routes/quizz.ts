@@ -34,7 +34,6 @@ router.get("/getQuizAdmin", verifyToken, getAssessmentAdmin);
 router.get("/getAllQuiz", verifyToken, getAllAssessment);
 router.get("/getPrevQuiz", verifyToken, getPreviousQuizzes);
 
-router.get("/:key", getAssessmentFile);
 router.put("/delete", verifyToken, deleteQuestion);
 router.delete("/deleteQuiz", verifyToken, deleteAssessment);
 router.post("/submitAssessment", verifyToken, submitAssessment);
@@ -49,5 +48,6 @@ router.put(
   verifyToken,
   editQuestion
 );
+router.get("/:key", getAssessmentFile);
 
 export default router;

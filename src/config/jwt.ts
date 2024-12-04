@@ -20,7 +20,7 @@ export const generateRefreshToken = async (user: UserDocument) => {
   const refreshToken = jwt.sign(
     { id: user.id, email: user.userEmail },
     process.env.JWT_REFRESH_SECRET as string,
-    { expiresIn: "7d" }
+    { expiresIn: "1y" }
   );
 
   // user.refreshToken = refreshToken;

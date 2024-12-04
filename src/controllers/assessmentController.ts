@@ -374,6 +374,7 @@ export const deleteAssessment = async (req: Request, res: Response) => {
   }
 };
 
+
 // export const submitAssessment = async (req: Request | any, res: Response) => {
 //   try {
 //     console.log("workingg anoooooooooooooooooooo");
@@ -545,11 +546,7 @@ export const submitAssessment = async (req: Request | any, res: Response) => {
     const assessment = await Assessment.findOne({ _id: quizId });
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
-    }
-
-    console.log(assessment);
-    console.log("assessment");
-
+    } 
     let totalMarks = 0;
     let totalScore = assessment.questions.reduce(
       (sum, question) => sum + question.mark,

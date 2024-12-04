@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  changePassword,
   getProfile,
   listUsers,
   //   deleteUser,
@@ -18,7 +19,8 @@ const upload = multer({ dest: "uploads/" });
 
 router.post("/login", login);
 router.post("/admin/login", login);
-router.post("/register", register);
+router.post("/register", register); 
+router.post("/changePassword",verifyToken, changePassword);
 router.get("/user/list", listUsers);
 router.get("/user/profile", verifyToken, getProfile);
 router.post(
@@ -31,6 +33,7 @@ router.post(
   },
   postProfile
 );
+
 // router.delete("/user/delete/:id", deleteUser);
 
 export default router;
