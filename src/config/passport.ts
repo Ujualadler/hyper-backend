@@ -21,6 +21,7 @@ passport.use(
           if (!user.googleId) {
             user.googleId = profile.id;
             user.lastLoginTime = lastLogin;
+            
             await user.save();
           }
         } else {
