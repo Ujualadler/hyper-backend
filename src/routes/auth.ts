@@ -26,12 +26,13 @@ router.get(
     console.log("Google Callback: User authenticated", user);
 
     // Correctly formatted URL
+    const appRedirectUrl = `myapp://auth?token=${token}&name=${user.userName}`;
     res.redirect(
-      `http://localhost:8081/login?token=${token}&name=${user.userName}`
+      appRedirectUrl
     );
   }
 );
 
-router.get("/refresh", refresh);
+router.post("/refresh", refresh);
 
 export default router;

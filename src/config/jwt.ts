@@ -17,10 +17,11 @@ export const generateAccessToken = (user: UserDocument) => {
 };
 
 export const generateRefreshToken = async (user: UserDocument) => {
+  const sixMonthsInSeconds = 6 * 30 * 24 * 60 * 60;
   const refreshToken = jwt.sign(
     { id: user.id, email: user.userEmail },
     process.env.JWT_REFRESH_SECRET as string,
-    { expiresIn: "1y" }
+    { expiresIn: sixMonthsInSeconds }
   );
 
   // user.refreshToken = refreshToken;
@@ -46,10 +47,8 @@ export const verifyEncToken = (
   res: Response,
   next: NextFunction
 ) => {
-  console.log(process.env.JWT_ENCRYPT_SECRET);
   // Extract the token from cookies
   const token = req.cookies["authToken"];
-  console.log(token);
   if (!token) return res.sendStatus(401); // No token provided
 
   const secretKey = process.env.JWT_ENCRYPT_SECRET as string;
@@ -65,7 +64,10 @@ export const verifyEncToken = (
 
 export const verifyAccessToken = (refreshToken: string): string | null => {
   try {
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string);
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET as string
+    );
     const user = decoded as UserDocument;
 
     // Generate a new access token
@@ -77,12 +79,11 @@ export const verifyAccessToken = (refreshToken: string): string | null => {
   }
 };
 
-
 export const verifyToken = (req: any, res: any, next: NextFunction) => {
   let token;
   // Check if the token is in the 'Authorization' header
 
-  console.log('ianm hereeeeeeeeeeeeeeeeeeeeeeeeeeee')
+  console.log("token evaluating");
   if (
     req.headers.authorization &&
     req.headers.authorization.startsWith("Bearer ")
