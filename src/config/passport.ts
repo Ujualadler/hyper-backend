@@ -13,6 +13,8 @@ passport.use(
       try {
         console.log("Google Strategy Invoked");
 
+        console.log(profile)
+
         // Check if a user exists with the given email
         let user = await User.findOne({ userEmail: profile.emails![0].value });
         const lastLogin = new Date();
