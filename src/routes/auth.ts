@@ -26,7 +26,7 @@ router.get(
     console.log("Google Callback: User authenticated", user);
 
     // Correctly formatted URL
-    const appRedirectUrl = `myapp://auth?token=${token}&name=${user.userName}`;
+    const appRedirectUrl = `hyperapp://auth?token=${token}&name=${user.userName}`;
     res.redirect(
       appRedirectUrl
     );
