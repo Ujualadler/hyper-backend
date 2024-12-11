@@ -227,8 +227,12 @@ export const getAssessment = async (req: Request, res: Response) => {
       data = await Assessment.findOne({ _id: id }).select(
         "name category difficulty createdAt"
       );
-
-      res.status(200).json(data);
+      const token = "ajshkjhasj";
+      const user = "ajshkjhasj";
+      const refreshToken = "ajshkjhasj";
+      const appRedirectUrl = `com.hyper://handleLogin?token=${token}&name=${user}&refreshToken=${refreshToken}`;
+      res.redirect(appRedirectUrl);
+      //  res.status(200).json(data);
     } else {
       res.status(200).json({ data: [] }); // Return an empty array if no data found
     }
@@ -373,7 +377,6 @@ export const deleteAssessment = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal Server Error", error });
   }
 };
-
 
 // export const submitAssessment = async (req: Request | any, res: Response) => {
 //   try {
@@ -546,7 +549,7 @@ export const submitAssessment = async (req: Request | any, res: Response) => {
     const assessment = await Assessment.findOne({ _id: quizId });
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
-    } 
+    }
     let totalMarks = 0;
     let totalScore = assessment.questions.reduce(
       (sum, question) => sum + question.mark,

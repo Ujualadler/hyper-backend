@@ -60,7 +60,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Generate tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = await generateRefreshToken(user); // Await the refresh token generation
-
+    
     res.status(200).json({
       message: "Login Success",
       token: accessToken,

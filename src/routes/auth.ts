@@ -26,14 +26,14 @@ router.get(
 
     console.log("Google Callback: User authenticated", user);
 
-    console.log(token)
-    console.log(refreshToken)
-    console.log(user.userName)
+    console.log(token);
+    console.log(refreshToken);
+    console.log(user.userName);
 
     // Correctly formatted URL
     const appRedirectUrl = `com.hyper://handleLogin?token=${token}&name=${user.userName}&refreshToken=${refreshToken}`;
     // const appRedirectUrl = `exp://192.168.0.135:8081/--login?token=${token}&name=${user.userName}`;
-
+    console.log(appRedirectUrl)
     res.redirect(appRedirectUrl);
   }
 );
