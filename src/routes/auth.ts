@@ -18,6 +18,11 @@ router.get(
   "/google/callback",
   passport.authenticate("google", { session: false }),
   (req, res) => {
+    if (!req.user) {
+      console.log("Google login canceled or failed");
+      const errorRedirectUrl = `com.hyper://login`;
+      return res.redirect(errorRedirectUrl); // Redirect with an error message
+    }
     const user = req.user as UserDocument;
 
     // Generate JWT
@@ -33,7 +38,7 @@ router.get(
     // Correctly formatted URL
     const appRedirectUrl = `com.hyper://handleLogin?token=${token}&name=${user.userName}&refreshToken=${refreshToken}`;
     // const appRedirectUrl = `exp://192.168.0.135:8081/--login?token=${token}&name=${user.userName}`;
-    console.log(appRedirectUrl)
+    console.log(appRedirectUrl);
     res.redirect(appRedirectUrl);
   }
 );
