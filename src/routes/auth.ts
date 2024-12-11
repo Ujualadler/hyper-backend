@@ -16,13 +16,9 @@ router.get(
 // Callback route for Google
 router.get(
   "/google/callback",
-  passport.authenticate("google", { session: false }),
+  passport.authenticate("google", { session: false,failureRedirect:'com.hyper://login' }),
   (req, res) => {
-    if (!req.user) {
-      console.log("Google login canceled or failed");
-      const errorRedirectUrl = `com.hyper://login`;
-      return res.redirect(errorRedirectUrl); // Redirect with an error message
-    }
+
     const user = req.user as UserDocument;
 
     // Generate JWT
