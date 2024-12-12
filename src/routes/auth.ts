@@ -13,12 +13,16 @@ router.get(
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
+
 // Callback route for Google
+
 router.get(
   "/google/callback",
-  passport.authenticate("google", { session: false,failureRedirect:'com.hyper://login' }),
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect: "com.hyper://login",
+  }),
   (req, res) => {
-
     const user = req.user as UserDocument;
 
     // Generate JWT

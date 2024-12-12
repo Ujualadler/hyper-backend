@@ -227,12 +227,8 @@ export const getAssessment = async (req: Request, res: Response) => {
       data = await Assessment.findOne({ _id: id }).select(
         "name category difficulty createdAt"
       );
-      const token = "ajshkjhasj";
-      const user = "ajshkjhasj";
-      const refreshToken = "ajshkjhasj";
-      const appRedirectUrl = `com.hyper://handleLogin?token=${token}&name=${user}&refreshToken=${refreshToken}`;
-      res.redirect(appRedirectUrl);
-      //  res.status(200).json(data);
+      
+       res.status(200).json(data);
     } else {
       res.status(200).json({ data: [] }); // Return an empty array if no data found
     }
