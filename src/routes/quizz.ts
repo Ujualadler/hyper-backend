@@ -43,6 +43,7 @@ router.put(
   "/edit",
   upload.fields([
     { name: "file", maxCount: 1 },
+    { name: "image", maxCount: 1 },
     { name: "optionsfile", maxCount: 10 },
   ]),
   verifyToken,

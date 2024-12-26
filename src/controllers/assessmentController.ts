@@ -126,6 +126,7 @@ export const getAllAssessment = async (req: any, res: Response) => {
     const user = await User.findOne({ _id: userId });
 
     let data;
+    let finalData;
 
     if (user?.isAdmin === true) {
       data = await Assessment.find().select(
@@ -156,15 +157,30 @@ export const getAllAssessment = async (req: any, res: Response) => {
       // Fetch data based on the query
       data = await Assessment.find(query).select(
         "name category createdAt difficulty image"
-      );
+      ).sort({_id:-1})
+
+      if (category === "all") {
+        // Group data into live and practice categories
+        finalData= data.reduce(
+          (acc: any, item: any) => {
+            if (item.category === "live") {
+              acc.live.push(item);
+            } else if (item.category === "practice") {
+              acc.practice.push(item);
+            }
+            return acc;
+          },
+          { live: [], practice: [] }
+        );
+      }
     }
 
     // Fetch the list of assessments attended by the current user
 
-    console.log("Available Assessments:", data);
+    console.log("Available Assessments:", finalData);
 
     if (data.length > 0) {
-      res.status(200).json({ data });
+      res.status(200).json({ data,finalData});
     } else {
       res.status(200).json({ data: [] });
     }
@@ -227,8 +243,8 @@ export const getAssessment = async (req: Request, res: Response) => {
       data = await Assessment.findOne({ _id: id }).select(
         "name category difficulty createdAt"
       );
-      
-       res.status(200).json(data);
+
+      res.status(200).json(data);
     } else {
       res.status(200).json({ data: [] }); // Return an empty array if no data found
     }
@@ -281,19 +297,31 @@ export const deleteQuestion = async (req: Request, res: Response) => {
 
 export const editQuestion = async (req: Request, res: Response) => {
   try {
-    // const files = req.files as { [fieldname: string]: Express.Multer.File[] };
-    // const file = files["file"];
-    // const optionfile = files["optionsfile"];
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
-    // // Upload main file if it exists
-    // if (file?.length) await uploadAssessment(file[0]);
+    const file = files["file"];
+    const image = files["image"];
+    const optionfile = files["optionsfile"];
 
-    // // Upload option files if they exist
-    // if (optionfile?.length) {
-    //   for (let i = 0; i < optionfile.length; i++) {
-    //     await uploadAssessment(optionfile[i]);
-    //   }
-    // }
+    if (file?.length && file[0]) {
+      await uploadAssessment(file[0]);
+    }
+
+    if (image?.length && image[0]) {
+      await uploadAssessment(image[0]);
+    }
+
+    if (optionfile?.length) {
+      for (let i = 0; i < optionfile.length; i++) {
+        if (optionfile[i]) {
+          await uploadAssessment(optionfile[i]);
+        }
+      }
+    }
+
+    console.log('image?.[0]?.originalname')
+    console.log(image?.[0]?.originalname)
+    console.log('image?.[0]?.originalname')
 
     const {
       questionText,
@@ -307,6 +335,7 @@ export const editQuestion = async (req: Request, res: Response) => {
     } = req.body;
 
     const updatedFields: any = {
+      
       "questions.$[elem].text": questionText,
       "questions.$[elem].time": time,
       "questions.$[elem].type": questionType,
@@ -322,7 +351,7 @@ export const editQuestion = async (req: Request, res: Response) => {
     // Update the specific question using array filters
     const updatedAssessment = await Assessment.findOneAndUpdate(
       { _id: id },
-      { $set: updatedFields },
+      { $set: {...updatedFields,image: image?.[0]?.originalname || null,} },
       {
         new: true, // Return the updated document
         arrayFilters: [{ "elem._id": questionId }], // Filter for the specific question
@@ -1020,9 +1049,42 @@ export const getPreviousQuizzes = async (req: any, res: Response) => {
       correctQuestionsAnswerd: 0,
       totalTimesSpend: 0,
       totalpointsCollected: 0,
+      currentRank:0,
     };
 
     const userData = await User.findById({ _id: userId });
+
+  
+
+      const rankPipeline = [
+        {
+          $sort: { totalPoints: -1 }, // Sort users by totalPoints in descending order
+        },
+        {
+          $group: {
+            _id: null, // Grouping is not necessary; used to maintain order
+            users: { $push: "$$ROOT" }, // Push all users to an array
+          },
+        },
+        {
+          $unwind: { path: "$users", includeArrayIndex: "rank" }, // Add rank based on array index
+        },
+        {
+          $project: {
+            _id: "$users._id",
+            userEmail: "$users.userEmail",
+            totalPoints: "$users.totalPoints",
+            rank: { $add: ["$rank", 1] }, // MongoDB ranks start at 0, so add 1
+          },
+        },
+        {
+          $match: { _id: new mongoose.Types.ObjectId(userData?._id as any) }, // Match the specific user
+        },
+      ];
+    
+      const result = await User.aggregate(rankPipeline as any);
+   
+      rewardData.currentRank=result[0].rank
 
     // Fetch the list of assessments attended by the current user
     const attendedAssessments = await Answer.find({ user: userId }).populate(
