@@ -155,13 +155,13 @@ export const getAllAssessment = async (req: any, res: Response) => {
       }
 
       // Fetch data based on the query
-      data = await Assessment.find(query).select(
-        "name category createdAt difficulty image"
-      ).sort({_id:-1})
+      data = await Assessment.find(query)
+        .select("name category createdAt difficulty image")
+        .sort({ _id: -1 });
 
       if (category === "all") {
         // Group data into live and practice categories
-        finalData= data.reduce(
+        finalData = data.reduce(
           (acc: any, item: any) => {
             if (item.category === "live") {
               acc.live.push(item);
@@ -180,7 +180,7 @@ export const getAllAssessment = async (req: any, res: Response) => {
     console.log("Available Assessments:", finalData);
 
     if (data.length > 0) {
-      res.status(200).json({ data,finalData});
+      res.status(200).json({ data, finalData });
     } else {
       res.status(200).json({ data: [] });
     }
@@ -319,9 +319,9 @@ export const editQuestion = async (req: Request, res: Response) => {
       }
     }
 
-    console.log('image?.[0]?.originalname')
-    console.log(image?.[0]?.originalname)
-    console.log('image?.[0]?.originalname')
+    console.log("image?.[0]?.originalname");
+    console.log(image?.[0]?.originalname);
+    console.log("image?.[0]?.originalname");
 
     const {
       questionText,
@@ -335,7 +335,6 @@ export const editQuestion = async (req: Request, res: Response) => {
     } = req.body;
 
     const updatedFields: any = {
-      
       "questions.$[elem].text": questionText,
       "questions.$[elem].time": time,
       "questions.$[elem].type": questionType,
@@ -351,7 +350,7 @@ export const editQuestion = async (req: Request, res: Response) => {
     // Update the specific question using array filters
     const updatedAssessment = await Assessment.findOneAndUpdate(
       { _id: id },
-      { $set: {...updatedFields,image: image?.[0]?.originalname || null,} },
+      { $set: { ...updatedFields, image: image?.[0]?.originalname || null } },
       {
         new: true, // Return the updated document
         arrayFilters: [{ "elem._id": questionId }], // Filter for the specific question
@@ -1018,6 +1017,7 @@ export const getOverallRankList = async (req: Request | any, res: Response) => {
           rank: 1,
           user: "$_id", // Use the user _id as reference
           userName: "$userDetails.userName",
+          image: "$userDetails.image",
           userEmail: "$userDetails.userEmail",
           totalPriorityScore: 1,
           combinedSortField: "$combinedSortField",
@@ -1049,42 +1049,40 @@ export const getPreviousQuizzes = async (req: any, res: Response) => {
       correctQuestionsAnswerd: 0,
       totalTimesSpend: 0,
       totalpointsCollected: 0,
-      currentRank:0,
+      currentRank: 0,
     };
 
     const userData = await User.findById({ _id: userId });
 
-  
+    const rankPipeline = [
+      {
+        $sort: { totalPoints: -1 }, // Sort users by totalPoints in descending order
+      },
+      {
+        $group: {
+          _id: null, // Grouping is not necessary; used to maintain order
+          users: { $push: "$$ROOT" }, // Push all users to an array
+        },
+      },
+      {
+        $unwind: { path: "$users", includeArrayIndex: "rank" }, // Add rank based on array index
+      },
+      {
+        $project: {
+          _id: "$users._id",
+          userEmail: "$users.userEmail",
+          totalPoints: "$users.totalPoints",
+          rank: { $add: ["$rank", 1] }, // MongoDB ranks start at 0, so add 1
+        },
+      },
+      {
+        $match: { _id: new mongoose.Types.ObjectId(userData?._id as any) }, // Match the specific user
+      },
+    ];
 
-      const rankPipeline = [
-        {
-          $sort: { totalPoints: -1 }, // Sort users by totalPoints in descending order
-        },
-        {
-          $group: {
-            _id: null, // Grouping is not necessary; used to maintain order
-            users: { $push: "$$ROOT" }, // Push all users to an array
-          },
-        },
-        {
-          $unwind: { path: "$users", includeArrayIndex: "rank" }, // Add rank based on array index
-        },
-        {
-          $project: {
-            _id: "$users._id",
-            userEmail: "$users.userEmail",
-            totalPoints: "$users.totalPoints",
-            rank: { $add: ["$rank", 1] }, // MongoDB ranks start at 0, so add 1
-          },
-        },
-        {
-          $match: { _id: new mongoose.Types.ObjectId(userData?._id as any) }, // Match the specific user
-        },
-      ];
-    
-      const result = await User.aggregate(rankPipeline as any);
-   
-      rewardData.currentRank=result[0].rank
+    const result = await User.aggregate(rankPipeline as any);
+
+    rewardData.currentRank = result[0].rank;
 
     // Fetch the list of assessments attended by the current user
     const attendedAssessments = await Answer.find({ user: userId }).populate(
