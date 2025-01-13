@@ -21,6 +21,7 @@ interface Question {
 // Define the Assessment interface that extends Mongoose's Document
 export interface AssessmentDocument extends Document {
   name: string;
+  quizCategory: mongoose.Types.ObjectId;
   image: string;
   questions: Question[];
   difficulty: string;
@@ -39,7 +40,8 @@ const OptionSchema = new Schema<Option>({
 // Define the Question Schema
 const QuestionSchema = new Schema<Question>({
   text: { type: String, required: true },
-  time: { type: String, required: false, default: "5" },
+
+  time: { type: String, required: false, default: "10" },
   type: {
     type: String,
     enum: ["multipleChoice", "singleChoice", "yesNo", "descriptive"],
@@ -54,6 +56,7 @@ const QuestionSchema = new Schema<Question>({
 // Define the Assessment Schema with a reference to the PPT schema
 const AssessmentSchema = new Schema<AssessmentDocument>({
   name: { type: String, required: true },
+  quizCategory: { type: Schema.Types.ObjectId, ref: "Category", required: true },
   image: { type: String, default: null },
   questions: { type: [QuestionSchema], required: true }, // Array of questions
   category: {

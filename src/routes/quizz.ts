@@ -15,10 +15,13 @@ import {
 } from "../controllers/assessmentController";
 import multer from "multer";
 import { verifyToken } from "../config/jwt";
+import { addCategory, getCategory } from "../controllers/categoryController";
 
 const router = Router();
 const upload = multer({ dest: "uploads" });
 
+router.post("/addCategory", verifyToken, addCategory);
+router.get("/getCategory", verifyToken, getCategory);
 router.post(
   "/createQuiz",
   upload.fields([

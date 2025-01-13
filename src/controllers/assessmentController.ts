@@ -42,6 +42,7 @@ export const createAssessment = async (req: Request, res: Response) => {
       options,
       time,
       difficulty,
+      quizCategory
     } = req.body;
 
     console.log(req.body);
@@ -76,6 +77,7 @@ export const createAssessment = async (req: Request, res: Response) => {
       // Create a new assessment if it doesn't exist
       assessment = new Assessment({
         name: name,
+        quizCategory:quizCategory,
         image: image?.[0]?.originalname || null,
         difficulty: difficulty,
         category: category,
@@ -115,7 +117,7 @@ export const getAssessmentFile = async (req: Request, res: Response) => {
 
 export const getAllAssessment = async (req: any, res: Response) => {
   try {
-    const { id, difficulty } = req.query;
+    const { id, difficulty, search } = req.query;
     const category = id;
     const userId = req.user.id; // Get the current user ID
 
@@ -129,9 +131,14 @@ export const getAllAssessment = async (req: any, res: Response) => {
     let finalData;
 
     if (user?.isAdmin === true) {
-      data = await Assessment.find().select(
-        "name category createdAt difficulty image"
-      );
+      // Fetch all assessments for admins
+      let adminQuery: any = {};
+      if (search) {
+        adminQuery.name = { $regex: search, $options: "i" }; // Match search term case-insensitively
+      }
+      data = await Assessment.find(adminQuery).select(
+        "name category quizCategory createdAt difficulty image"
+      ).populate('quizCategory')
     } else {
       const attendedAssessments = await Answer.find({ user: userId }).distinct(
         "assessment"
@@ -144,20 +151,80 @@ export const getAllAssessment = async (req: any, res: Response) => {
 
       let query: any = { _id: { $nin: attendedAssessments } }; // Exclude attended assessments
 
-      // If difficulty is not provided (i.e., it is ''), fetch all assessments.
-
+      // Apply category filter if provided
       if (category !== "all") {
-        query.category = category; // Filter by category if provided
+        query.category = category;
       }
 
+      // Apply difficulty filter if provided
       if (difficulty !== "") {
-        query.difficulty = difficulty; // Filter by difficulty if provided
+        query.difficulty = difficulty;
+      }
+
+      // Apply search filter if provided
+      if (search) {
+        query.name = { $regex: search, $options: "i" }; // Match search term case-insensitively
       }
 
       // Fetch data based on the query
-      data = await Assessment.find(query)
-        .select("name category createdAt difficulty image")
-        .sort({ _id: -1 });
+         data = await Assessment.aggregate([
+        {
+          $match: query, // Apply filters
+        },
+        {
+          $lookup: {
+            from: "categories", // Name of the category collection
+            localField: "quizCategory",
+            foreignField: "_id",
+            as: "quizCategoryDetails",
+          },
+        },
+        {
+          $unwind: "$quizCategoryDetails", // Ensure proper grouping
+        },
+        {
+          $group: {
+            _id: {
+              category: "$category", // Group by `category`
+              quizCategory: "$quizCategoryDetails.category", // Group by `quizCategory`
+            },
+            assessments: {
+              $push: {
+                _id: "$_id",
+                name: "$name",
+                image: "$image",
+                category: "$category",
+                quizCategory: "$quizCategory",
+                difficulty: "$difficulty",
+                createdAt: "$createdAt",
+              },
+            },
+          },
+        },
+        {
+          $group: {
+            _id: "$_id.category", // Group again by `category`
+            quizzes: {
+              $push: {
+                quizCategory: "$_id.quizCategory",
+                assessments: "$assessments",
+              },
+            },
+          },
+        },
+        {
+          $project: {
+            category: "$_id",
+            quizzes: 1,
+            _id: 0,
+          },
+        },
+      ]);
+
+
+        console.log('data')
+        console.log(data)
+        console.log('data')
 
       if (category === "all") {
         // Group data into live and practice categories
@@ -175,8 +242,7 @@ export const getAllAssessment = async (req: any, res: Response) => {
       }
     }
 
-    // Fetch the list of assessments attended by the current user
-
+    // Log available assessments
     console.log("Available Assessments:", finalData);
 
     if (data.length > 0) {
@@ -192,6 +258,7 @@ export const getAllAssessment = async (req: any, res: Response) => {
     });
   }
 };
+
 
 export const getAssessmentAdmin = async (req: Request, res: Response) => {
   try {
@@ -243,6 +310,8 @@ export const getAssessment = async (req: Request, res: Response) => {
       data = await Assessment.findOne({ _id: id }).select(
         "name category difficulty createdAt"
       );
+
+      console.log(data)
 
       res.status(200).json(data);
     } else {
@@ -325,6 +394,7 @@ export const editQuestion = async (req: Request, res: Response) => {
 
     const {
       questionText,
+      quizCategory,
       questionType,
       questionMark,
       id, // Assessment ID
@@ -350,7 +420,7 @@ export const editQuestion = async (req: Request, res: Response) => {
     // Update the specific question using array filters
     const updatedAssessment = await Assessment.findOneAndUpdate(
       { _id: id },
-      { $set: { ...updatedFields, image: image?.[0]?.originalname || null } },
+      { $set: { ...updatedFields, image: image?.[0]?.originalname || null,quizCategory:quizCategory } },
       {
         new: true, // Return the updated document
         arrayFilters: [{ "elem._id": questionId }], // Filter for the specific question
@@ -1072,7 +1142,7 @@ export const getPreviousQuizzes = async (req: any, res: Response) => {
           _id: "$users._id",
           userEmail: "$users.userEmail",
           totalPoints: "$users.totalPoints",
-          rank: { $add: ["$rank", 1] }, // MongoDB ranks start at 0, so add 1
+          rank: { $add: ["$rank", 0] }, // MongoDB ranks start at 0, so add 1
         },
       },
       {
